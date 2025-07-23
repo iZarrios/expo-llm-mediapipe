@@ -6,16 +6,17 @@ import HookAssetDemoScreen from './screens/HookAssetDemoScreen';
 import HooklessDownloadableDemoScreen from './screens/HooklessDownloadableDemoScreen';
 import HooklessAssetDemoScreen from './screens/HooklessAssetDemoScreen';
 import HooklessUtilityDemoScreen from './screens/HooklessUtilityDemoScreen';
+import Yes from './screens/Yes';
 
 type DemoScreen =
   | 'HookDownloadable'
   | 'HookAsset'
   | 'HooklessDownloadable'
   | 'HooklessAsset'
-  | 'HooklessUtility';
+  | 'HooklessUtility' | 'Yes';
 
 const App = () => {
-  const [activeScreen, setActiveScreen] = useState<DemoScreen>('HooklessUtility');
+  const [activeScreen, setActiveScreen] = useState<DemoScreen>('Yes');
 
   const renderScreen = () => {
     switch (activeScreen) {
@@ -29,6 +30,8 @@ const App = () => {
         return <HooklessAssetDemoScreen />;
       case 'HooklessUtility':
         return <HooklessUtilityDemoScreen />;
+      case 'Yes':
+        return <Yes/>
       default:
         return <Text>Select a demo</Text>;
     }
@@ -50,6 +53,7 @@ const App = () => {
       </View>
       <View style={styles.navContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navScrollView}>
+          <NavButton title="Yes" screen="Yes" />
           <NavButton title="Hookless: Utility" screen="HooklessUtility" />
           <NavButton title="Hookless: Download" screen="HooklessDownloadable" />
           <NavButton title="Hookless: Asset" screen="HooklessAsset" />

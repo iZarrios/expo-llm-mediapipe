@@ -41,6 +41,7 @@ export type LlmInferenceConfig = LlmModelLocation & {
   topK?: number;
   temperature?: number;
   randomSeed?: number;
+  multiModal?: boolean;
 };
 
 export interface DownloadProgressEvent {
@@ -64,6 +65,7 @@ type BaseLlmParams = {
   topK?: number;
   temperature?: number;
   randomSeed?: number;
+  multiModal?: boolean;
 };
 
 /**
@@ -88,6 +90,7 @@ export type UseLLMDownloadableProps = BaseLlmParams & { modelUrl: string; modelN
 export interface BaseLlmReturn {
   generateResponse: (
     promptText: string,
+    imagePath: string,
     onPartial?: (partial: string, reqId: number | undefined) => void,
     onErrorCb?: (message: string, reqId: number | undefined) => void,
     abortSignal?: AbortSignal
@@ -122,6 +125,7 @@ export interface ExpoLlmMediapipeModule {
    * @param topK - The number of top tokens to consider.
    * @param temperature - The temperature for sampling.
    * @param randomSeed - The random seed for reproducibility.
+   * @param multimodal - multimodal flag for model
    * @returns A promise that resolves to the model handle.
    */
   createModel(
@@ -130,6 +134,7 @@ export interface ExpoLlmMediapipeModule {
     topK: number,
     temperature: number,
     randomSeed: number,
+    multiModal: boolean,
   ): Promise<number>;
 
   /**
@@ -139,6 +144,7 @@ export interface ExpoLlmMediapipeModule {
    * @param topK - The number of top tokens to consider.
    * @param temperature - The temperature for sampling.
    * @param randomSeed - The random seed for reproducibility.
+   * @param multimodal - multimodal flag for model
    * @returns A promise that resolves to the model handle.
    */
   createModelFromAsset(
@@ -147,6 +153,7 @@ export interface ExpoLlmMediapipeModule {
     topK: number,
     temperature: number,
     randomSeed: number,
+    multiModal: boolean,
   ): Promise<number>;
   releaseModel(handle: number): Promise<boolean>;
 
@@ -161,6 +168,7 @@ export interface ExpoLlmMediapipeModule {
     handle: number,
     requestId: number,
     prompt: string,
+    imagePath: string,
   ): Promise<string>;
 
   /**
@@ -174,6 +182,7 @@ export interface ExpoLlmMediapipeModule {
     handle: number,
     requestId: number,
     prompt: string,
+    imagePath: string,
   ): Promise<boolean>;
 
   /**
@@ -223,6 +232,7 @@ export interface ExpoLlmMediapipeModule {
    * @param topK - The number of top tokens to consider.
    * @param temperature - The temperature for sampling.
    * @param randomSeed - The random seed for reproducibility.
+   * @param multiModal - The random seed for reproducibility.
    * @returns A promise that resolves to the model handle.
    */
   createModelFromDownloaded(
@@ -231,6 +241,7 @@ export interface ExpoLlmMediapipeModule {
     topK?: number,
     temperature?: number,
     randomSeed?: number,
+    multiModal?: boolean,
   ): Promise<number>;
 
   /**

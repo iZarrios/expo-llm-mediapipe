@@ -17,13 +17,15 @@ class LlmInferenceModel {
   private let modelHandle: Int
   private let eventEmitter: (String, [String: Any]) -> Void
   private var currentResponse: String = ""
+
   
   // Store parameters for later use in session creation
   private let temperature: Float
   private let topK: Int
   private let randomSeed: Int
+  private let multiModal: Bool
   
-  init(modelPath: String, maxTokens: Int, topK: Int, temperature: Float, randomSeed: Int,
+  init(modelPath: String, maxTokens: Int, topK: Int, temperature: Float, randomSeed: Int, multiModal: Bool,
        eventEmitter: @escaping (String, [String: Any]) -> Void, modelHandle: Int) throws {
     
     self.maxTokens = maxTokens
@@ -32,6 +34,7 @@ class LlmInferenceModel {
     self.topK = topK
     self.temperature = temperature
     self.randomSeed = randomSeed
+    self.multiModal =  multiModal
     
     // Log model loading
     self.eventEmitter("logging", [
@@ -90,7 +93,7 @@ class LlmInferenceModel {
     return "\(startTurn)\(userPrefix)\n\(text)\(endTurn)\(startTurn)\(modelPrefix)"
   }
   
-  func generateResponse(requestId: Int, prompt: String, completion: @escaping (Result<String, Error>) -> Void) throws {
+  func generateResponse(requestId: Int, prompt: String, imagePath: String, completion: @escaping (Result<String, Error>) -> Void) throws {
     guard let session = session else {
       throw LlmError.sessionError("Session not initialized")
     }
@@ -108,6 +111,7 @@ class LlmInferenceModel {
       do {
         let formattedPrompt = formatPrompt(text: prompt)
         try session.addQueryChunk(inputText: formattedPrompt)
+        // TODO: does multiModal support exists in iOS?
         
         var fullResponse = ""
         let responseStream = session.generateResponseAsync()

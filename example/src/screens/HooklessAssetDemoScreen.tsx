@@ -35,7 +35,7 @@ const HooklessAssetDemoScreen = () => {
     listenersRef.current.forEach(sub => sub.remove());
     listenersRef.current = [];
   };
-  
+
   useEffect(() => {
     // Model is no longer loaded automatically on mount.
     // User must press the "Load Asset Model" button.
@@ -64,7 +64,8 @@ const HooklessAssetDemoScreen = () => {
         1024, // maxTokens
         1,   // topK
         0.5, // temperature
-        Platform.OS === 'android' ? 456 : 0 // randomSeed
+        Platform.OS === 'android' ? 456 : 0, // randomSeed
+        false,
       );
       setModelHandle(handle);
       setIsModelLoaded(true);
@@ -109,7 +110,7 @@ const HooklessAssetDemoScreen = () => {
     setError('');
     const requestId = nextRequestIdRef.current++;
     try {
-      const result = await ExpoLlmMediapipe.generateResponse(modelHandle, requestId, prompt);
+      const result = await ExpoLlmMediapipe.generateResponse(modelHandle, requestId, prompt, '');
       setResponse(result);
     } catch (e: any) {
       setError(`Generate Response Error: ${e.message}`);
@@ -127,10 +128,10 @@ const HooklessAssetDemoScreen = () => {
     setResponse('');
     setStreamingResponse('');
     setError('');
-    
+
     // Clear only response/error listeners, not all listeners (e.g., if there were others)
     // For this screen, clearListeners() is fine as we only have response/error ones during generation.
-    clearListeners(); 
+    clearListeners();
 
     const currentRequestId = nextRequestIdRef.current++;
     let accumulatedResponse = "";
@@ -153,7 +154,7 @@ const HooklessAssetDemoScreen = () => {
     listenersRef.current.push(errorSub);
 
     try {
-      await ExpoLlmMediapipe.generateResponseAsync(modelHandle, currentRequestId, prompt);
+      await ExpoLlmMediapipe.generateResponseAsync(modelHandle, currentRequestId, prompt, '');
       // Native side resolves when streaming is complete.
     } catch (e: any) {
       setError(`Generate Streaming Error: ${e.message}`);
@@ -184,7 +185,7 @@ const HooklessAssetDemoScreen = () => {
             Asset model not loaded. {error ? `Error: ${error}` : 'Press "Load Asset Model" below.'}
           </Text>
         )}
-         <View style={styles.buttonContainer}>
+        <View style={styles.buttonContainer}>
           <Button
             title={isModelLoaded ? "Release Model" : "Load Asset Model"}
             onPress={isModelLoaded ? handleReleaseModel : handleLoadModel}
@@ -237,82 +238,82 @@ const HooklessAssetDemoScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: { 
-        flex: 1, 
-        backgroundColor: 'white' 
-    },
-    contentContainer: { 
-        padding: 15 
-    },
-    title: { 
-        fontSize: 22, 
-        fontWeight: 'bold', 
-        textAlign: 'center', 
-        marginBottom: 20, 
-        color: '#333' 
-    },
-    section: { 
-        marginBottom: 20, 
-        padding: 15, 
-        backgroundColor: '#f9f9f9', 
-        borderRadius: 8, 
-        borderWidth: 1, 
-        borderColor: '#eee' 
-    },
-    sectionTitle: { 
-        fontSize: 18, 
-        fontWeight: '600', 
-        marginBottom: 10, 
-        color: '#444' 
-    },
-    input: { 
-        borderWidth: 1, 
-        borderColor: '#ccc', 
-        borderRadius: 5, 
-        padding: 10, 
-        marginBottom: 10, 
-        backgroundColor: '#fff', 
-        minHeight: 60, 
-        textAlignVertical: 'top' 
-    },
-    buttonContainer: { 
-        marginVertical: 5 
-    },
-    responseText: { 
-        marginTop: 10, 
-        padding: 10, 
-        backgroundColor: '#e9e9e9', 
-        borderRadius: 5, 
-        color: '#333', 
-        fontSize: 14 
-    },
-    errorText: { 
-        color: 'red', 
-        fontWeight: 'bold', 
-        textAlign: 'center', 
-        marginTop: 5 
-    },
-    successText: { 
-        color: 'green', 
-        fontWeight: 'bold', 
-        marginTop: 5 
-    },
-    loader: { 
-        marginVertical: 20 
-    },
-    initializingContainer: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        marginTop: 5 
-    },
-    initializingIndicator: { 
-        marginRight: 8 
-    },
-    initializingText: { 
-        color: '#555', 
-        fontSize: 14, 
-        flexShrink: 1 
-    },
+  container: {
+    flex: 1,
+    backgroundColor: 'white'
+  },
+  contentContainer: {
+    padding: 15
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333'
+  },
+  section: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee'
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#444'
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    minHeight: 60,
+    textAlignVertical: 'top'
+  },
+  buttonContainer: {
+    marginVertical: 5
+  },
+  responseText: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#e9e9e9',
+    borderRadius: 5,
+    color: '#333',
+    fontSize: 14
+  },
+  errorText: {
+    color: 'red',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 5
+  },
+  successText: {
+    color: 'green',
+    fontWeight: 'bold',
+    marginTop: 5
+  },
+  loader: {
+    marginVertical: 20
+  },
+  initializingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5
+  },
+  initializingIndicator: {
+    marginRight: 8
+  },
+  initializingText: {
+    color: '#555',
+    fontSize: 14,
+    flexShrink: 1
+  },
 });
 
 export default HooklessAssetDemoScreen;

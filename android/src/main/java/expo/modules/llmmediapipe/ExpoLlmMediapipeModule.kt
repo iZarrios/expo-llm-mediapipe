@@ -123,7 +123,7 @@ class ExpoLlmMediapipeModule : Module() {
   }
   
   // Create model internal helper method
-  private fun createModelInternal(modelPath: String, maxTokens: Int, topK: Int, temperature: Double, randomSeed: Int): Int {
+  private fun createModelInternal(modelPath: String, maxTokens: Int, topK: Int, temperature: Double, randomSeed: Int, multiModal: Boolean): Int {
     val modelHandle = nextHandle++
     val model = LlmInferenceModel(
       appContext.reactContext!!,
@@ -132,6 +132,7 @@ class ExpoLlmMediapipeModule : Module() {
       topK,
       temperature.toFloat(),
       randomSeed,
+      multiModal,
       inferenceListener = createInferenceListener(modelHandle)
     )
     modelMap[modelHandle] = model
@@ -154,7 +155,7 @@ class ExpoLlmMediapipeModule : Module() {
       "Hello world from MediaPipe LLM! 👋"
     }
 
-    AsyncFunction("createModel") { modelPath: String, maxTokens: Int, topK: Int, temperature: Double, randomSeed: Int, promise: Promise ->
+    AsyncFunction("createModel") { modelPath: String, maxTokens: Int, topK: Int, temperature: Double, randomSeed: Int, multiModal: Boolean, promise: Promise ->
       try {
         val modelHandle = nextHandle++
         
@@ -171,6 +172,7 @@ class ExpoLlmMediapipeModule : Module() {
           topK,
           temperature.toFloat(),
           randomSeed,
+          multiModal,
           inferenceListener = createInferenceListener(modelHandle)
         )
         modelMap[modelHandle] = model
@@ -184,7 +186,7 @@ class ExpoLlmMediapipeModule : Module() {
       }
     }
 
-    AsyncFunction("createModelFromAsset") { modelName: String, maxTokens: Int, topK: Int, temperature: Double, randomSeed: Int, promise: Promise ->
+    AsyncFunction("createModelFromAsset") { modelName: String, maxTokens: Int, topK: Int, temperature: Double, randomSeed: Int, multiModal: Boolean, promise: Promise ->
       try {
         // Log that we're creating a model from asset
         sendEvent("logging", mapOf(
@@ -205,6 +207,7 @@ class ExpoLlmMediapipeModule : Module() {
           topK,
           temperature.toFloat(),
           randomSeed,
+          multiModal,
           inferenceListener = createInferenceListener(modelHandle)
         )
         modelMap[modelHandle] = model
@@ -231,7 +234,7 @@ class ExpoLlmMediapipeModule : Module() {
       }
     }
 
-    AsyncFunction("generateResponse") { handle: Int, requestId: Int, prompt: String, promise: Promise ->
+    AsyncFunction("generateResponse") { handle: Int, requestId: Int, prompt: String, imagePath: String, promise: Promise ->
       try {
         val model = modelMap[handle]
         if (model == null) {
@@ -245,7 +248,7 @@ class ExpoLlmMediapipeModule : Module() {
         ))
         
         // Use the synchronous version
-        val response = model.generateResponse(requestId, prompt)
+        val response = model.generateResponse(requestId, prompt, imagePath)
         promise.resolve(response)
       } catch (e: Exception) {
         sendEvent("logging", mapOf(
@@ -256,7 +259,7 @@ class ExpoLlmMediapipeModule : Module() {
       }
     }
 
-    AsyncFunction("generateResponseAsync") { handle: Int, requestId: Int, prompt: String, promise: Promise ->
+    AsyncFunction("generateResponseAsync") { handle: Int, requestId: Int, prompt: String, imagePath: String, promise: Promise ->
       try {
         val model = modelMap[handle]
         if (model == null) {
@@ -272,7 +275,7 @@ class ExpoLlmMediapipeModule : Module() {
         
         // Use the async version with callback and event emission
         try {
-          model.generateResponseAsync(requestId, prompt) { result ->
+          model.generateResponseAsync(requestId, prompt, imagePath) { result ->
             try {
               if (result.isEmpty()) {
                 sendEvent("logging", mapOf(
@@ -469,7 +472,7 @@ class ExpoLlmMediapipeModule : Module() {
     }
     
     // Create model from downloaded file
-    AsyncFunction("createModelFromDownloaded") { modelName: String, maxTokens: Int?, topK: Int?, temperature: Double?, randomSeed: Int?, promise: Promise ->
+    AsyncFunction("createModelFromDownloaded") { modelName: String, maxTokens: Int?, topK: Int?, temperature: Double?, randomSeed: Int?, multiModal: Boolean?, promise: Promise ->
       val modelFile = getModelFile(modelName)
       
       if (!modelFile.exists()) {
@@ -483,7 +486,8 @@ class ExpoLlmMediapipeModule : Module() {
           maxTokens ?: 1024,
           topK ?: 40,
           temperature ?: 0.7,
-          randomSeed ?: 42
+          randomSeed ?: 42,
+          multiModal ?: false
         )
         // Explicitly cast to avoid ambiguity
         promise.resolve(handle as Int)

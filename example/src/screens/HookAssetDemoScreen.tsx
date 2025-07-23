@@ -46,7 +46,7 @@ const HookAssetDemoScreen = () => {
     setStreamingResponse('');
     setError('');
     try {
-      const result = await llm.generateResponse(prompt);
+      const result = await llm.generateResponse(prompt, '');
       setResponse(result);
     } catch (e: any) {
         setError(`Generate Response Error: ${e.message}`);

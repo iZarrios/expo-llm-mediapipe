@@ -43,7 +43,7 @@ function _useLLMDownloadable(props: UseLLMDownloadableProps): DownloadableLlmRet
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = React.useState(true);
 
-  const { modelUrl, modelName, maxTokens, topK, temperature, randomSeed } = props;
+  const { modelUrl, modelName, maxTokens, topK, temperature, randomSeed, multiModal } = props;
 
   React.useEffect(() => {
     const checkModelStatus = async () => {
@@ -134,6 +134,7 @@ function _useLLMDownloadable(props: UseLLMDownloadableProps): DownloadableLlmRet
         topK ?? 40,
         temperature ?? 0.8,
         randomSeed ?? 0,
+        multiModal ?? false,
       );
       console.log(`Loaded downloaded model '${modelName}' with handle ${handle}`);
       setModelHandle(handle);
@@ -142,11 +143,12 @@ function _useLLMDownloadable(props: UseLLMDownloadableProps): DownloadableLlmRet
       setModelHandle(undefined);
       throw error;
     }
-  }, [modelHandle, downloadStatus, modelName, maxTokens, topK, temperature, randomSeed]);
+  }, [modelHandle, downloadStatus, modelName, maxTokens, topK, temperature, randomSeed, multiModal]);
 
   const generateResponse = React.useCallback(
     async (
       promptText: string,
+      imagePath: string,
       onPartial?: (partial: string, reqId: number | undefined) => void,
       onErrorCb?: (message: string, reqId: number | undefined) => void,
       abortSignal?: AbortSignal,
@@ -168,7 +170,7 @@ function _useLLMDownloadable(props: UseLLMDownloadableProps): DownloadableLlmRet
       });
 
       try {
-        return await module.generateResponse(modelHandle, requestId, promptText);
+        return await module.generateResponse(modelHandle, requestId, promptText, '');
       } catch (e) {
         console.error("Generate response error:", e);
         if (onErrorCb && !(abortSignal?.aborted ?? false)) {
@@ -219,7 +221,7 @@ function _useLLMDownloadable(props: UseLLMDownloadableProps): DownloadableLlmRet
           });
         }
 
-        module.generateResponseAsync(modelHandle, requestId, promptText)
+        module.generateResponseAsync(modelHandle, requestId, promptText, '')
           .then(() => {
             if (!(abortSignal?.aborted ?? false)) {
               errorSubscription.remove();
@@ -263,7 +265,7 @@ function _useLLMBase(props: UseLLMAssetProps | UseLLMFileProps): BaseLlmReturn {
   const [modelHandle, setModelHandle] = React.useState<number | undefined>();
   const nextRequestIdRef = React.useRef(0);
 
-  const { maxTokens, topK, temperature, randomSeed } = props;
+  const { maxTokens, topK, temperature, randomSeed, multiModal } = props;
   let modelIdentifier: string | undefined;
   let storageType: "asset" | "file" | undefined;
 
@@ -283,14 +285,14 @@ function _useLLMBase(props: UseLLMAssetProps | UseLLMFileProps): BaseLlmReturn {
 
     const currentConfigStorageKey = modelIdentifier;
     const currentStorageType = storageType;
-    
+
     console.log(`Attempting to create non-downloadable model: ${currentConfigStorageKey}, type: ${currentStorageType}`);
-    
+
     let active = true;
     const modelCreatePromise =
       currentStorageType === "asset"
-        ? module.createModelFromAsset(currentConfigStorageKey, maxTokens ?? 512, topK ?? 40, temperature ?? 0.8, randomSeed ?? 0)
-        : module.createModel(currentConfigStorageKey, maxTokens ?? 512, topK ?? 40, temperature ?? 0.8, randomSeed ?? 0);
+        ? module.createModelFromAsset(currentConfigStorageKey, maxTokens ?? 512, topK ?? 40, temperature ?? 0.8, randomSeed ?? 0, multiModal ?? false)
+        : module.createModel(currentConfigStorageKey, maxTokens ?? 512, topK ?? 40, temperature ?? 0.8, randomSeed ?? 0, multiModal ?? false);
 
     modelCreatePromise
       .then((handle: number) => {
@@ -311,7 +313,7 @@ function _useLLMBase(props: UseLLMAssetProps | UseLLMFileProps): BaseLlmReturn {
     return () => {
       active = false;
     };
-  }, [modelIdentifier, storageType, maxTokens, topK, temperature, randomSeed]);
+  }, [modelIdentifier, storageType, maxTokens, topK, temperature, randomSeed, multiModal]);
 
   React.useEffect(() => {
     const currentModelHandle = modelHandle;
@@ -328,6 +330,7 @@ function _useLLMBase(props: UseLLMAssetProps | UseLLMFileProps): BaseLlmReturn {
   const generateResponse = React.useCallback(
     async (
       promptText: string,
+      imagePath: string,
       onPartial?: (partial: string, reqId: number | undefined) => void,
       onErrorCb?: (message: string, reqId: number | undefined) => void,
       abortSignal?: AbortSignal,
@@ -349,7 +352,7 @@ function _useLLMBase(props: UseLLMAssetProps | UseLLMFileProps): BaseLlmReturn {
       });
 
       try {
-        return await module.generateResponse(modelHandle, requestId, promptText);
+        return await module.generateResponse(modelHandle, requestId, promptText, '');
       } catch (e) {
         console.error("Generate response error:", e);
         if (onErrorCb && !(abortSignal?.aborted ?? false)) {
@@ -400,7 +403,7 @@ function _useLLMBase(props: UseLLMAssetProps | UseLLMFileProps): BaseLlmReturn {
           });
         }
 
-        module.generateResponseAsync(modelHandle, requestId, promptText)
+        module.generateResponseAsync(modelHandle, requestId, promptText, '')
           .then(() => {
             if (!(abortSignal?.aborted ?? false)) {
               errorSubscription.remove();
@@ -488,14 +491,14 @@ export function generateStreamingText(
         // Check if subscriptions still exist before removing
         // This is a defensive check, as they might have been removed by completion/error
         try {
-            partialSubscription.remove();
+          partialSubscription.remove();
         } catch (subError) {
-            // console.warn("generateStreamingText: Error removing partialSubscription on abort:", subError);
+          // console.warn("generateStreamingText: Error removing partialSubscription on abort:", subError);
         }
         try {
-            errorSubscription.remove();
+          errorSubscription.remove();
         } catch (subError) {
-            // console.warn("generateStreamingText: Error removing errorSubscription on abort:", subError);
+          // console.warn("generateStreamingText: Error removing errorSubscription on abort:", subError);
         }
         console.log(`generateStreamingText Request ${requestId} aborted.`);
         reject(new Error("Aborted"));
@@ -503,7 +506,7 @@ export function generateStreamingText(
     }
 
     module
-      .generateResponseAsync(modelHandle, requestId, prompt)
+      .generateResponseAsync(modelHandle, requestId, prompt, '')
       .then(() => {
         if (!(abortSignal?.aborted ?? false)) {
           partialSubscription.remove();

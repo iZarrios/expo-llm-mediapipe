@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+
 import {
   StyleSheet,
   Text,
@@ -9,99 +12,34 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import ExpoLlmMediapipe, {
-  DownloadProgressEvent,
   NativeModuleSubscription,
   PartialResponseEventPayload,
   ErrorResponseEventPayload,
-  DownloadOptions,
 } from 'expo-llm-mediapipe';
 
-const DOWNLOADABLE_MODEL_URL = 'https://huggingface.co/t-ghosh/gemma-tflite/resolve/main/gemma-1.1-2b-it-cpu-int4.bin';
-const DOWNLOADABLE_MODEL_NAME = 'gemma-1.1-2b-it-cpu-int4.bin';
 
-const HooklessDownloadableDemoScreen = () => {
+const Yes = () => {
   const [modelHandle, setModelHandle] = useState<number | undefined>();
   const [prompt, setPrompt] = useState<string>('Explain "Large Language Model" in one sentence.');
+  const [imagePath, setImagePath] = useState<string | null>(null);
   const [response, setResponse] = useState<string>('');
   const [streamingResponse, setStreamingResponse] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isLoadingAction, setIsLoadingAction] = useState<boolean>(false);
+  const [modelPath, setModelPath] = useState<string | null>(null);
 
-  const [downloadStatus, setDownloadStatus] = useState<
-    "not_downloaded" | "downloading" | "downloaded" | "error" | "checking"
-  >("checking");
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const nextRequestIdRef = useRef(0);
   const streamingListenersRef = useRef<NativeModuleSubscription[]>([]);
-  const downloadProgressListenerRef = useRef<NativeModuleSubscription | null>(null);
 
   const clearStreamingListeners = () => {
     streamingListenersRef.current.forEach(sub => sub.remove());
     streamingListenersRef.current = [];
   };
 
-  useEffect(() => {
-    const checkInitialStatus = async () => {
-      setIsLoadingAction(true);
-      setDownloadStatus("checking");
-      try {
-        const isDownloaded = await ExpoLlmMediapipe.isModelDownloaded(DOWNLOADABLE_MODEL_NAME);
-        setDownloadStatus(isDownloaded ? "downloaded" : "not_downloaded");
-        if (isDownloaded) setDownloadProgress(1);
-      } catch (e: any) {
-        setError(`Error checking model status: ${e.message}`);
-        setDownloadStatus("error");
-        setDownloadError(e.message);
-      } finally {
-        setIsLoadingAction(false);
-      }
-    };
-    checkInitialStatus();
-
-    if (!downloadProgressListenerRef.current) {
-      downloadProgressListenerRef.current = ExpoLlmMediapipe.addListener(
-        "downloadProgress",
-        (event: DownloadProgressEvent) => {
-          if (event.modelName !== DOWNLOADABLE_MODEL_NAME) return;
-
-          if (event.status === "downloading") {
-            setDownloadStatus("downloading");
-            setDownloadProgress(event.progress ?? 0);
-            setDownloadError(null);
-            // setIsLoadingAction is already true if download was user-initiated
-          } else if (event.status === "completed") {
-            setDownloadStatus("downloaded");
-            setDownloadProgress(1);
-            setDownloadError(null);
-            Alert.alert("Download Complete", `${DOWNLOADABLE_MODEL_NAME} has been downloaded.`);
-            setIsLoadingAction(false); // Stop loading indicator
-          } else if (event.status === "error") {
-            setDownloadStatus("error");
-            setDownloadError(event.error || "Unknown download error");
-            setError(`Download Error: ${event.error}`);
-            setIsLoadingAction(false); // Stop loading indicator
-          } else if (event.status === "cancelled") {
-            setDownloadStatus("not_downloaded");
-            setDownloadProgress(0);
-            Alert.alert("Download Cancelled");
-            setIsLoadingAction(false); // Stop loading indicator
-          }
-        }
-      );
-    }
-
-    return () => {
-      // Cleanup for component unmount
-      clearStreamingListeners();
-      downloadProgressListenerRef.current?.remove();
-      downloadProgressListenerRef.current = null;
-      // Model release is handled by the other useEffect dependent on modelHandle
-    };
-  }, []); // Empty dependency array: runs once on mount, cleans up on unmount
 
   useEffect(() => {
     // Effect to release model when modelHandle changes (e.g., set to undefined) or on unmount
@@ -116,59 +54,31 @@ const HooklessDownloadableDemoScreen = () => {
   }, [modelHandle]);
 
 
-  const handleDownloadModel = async () => {
-    if (downloadStatus === "downloading") return;
-    setIsLoadingAction(true); // Start loading indicator
-    setError('');
-    setDownloadError(null);
-    setDownloadStatus("downloading");
-    setDownloadProgress(0);
-    try {
-      const options: DownloadOptions = { overwrite: true, timeout: 60000 }; // 60s timeout
-      await ExpoLlmMediapipe.downloadModel(DOWNLOADABLE_MODEL_URL, DOWNLOADABLE_MODEL_NAME, options);
-      // If downloadModel resolves, download has started. Listener will handle isLoadingAction=false.
-    } catch (e: any) {
-      setError(`Download initiation error: ${e.message}`);
-      setDownloadStatus("error");
-      setDownloadError(e.message);
-      setIsLoadingAction(false); // Stop loading indicator if download initiation failed
-    }
-  };
 
-  const handleCancelDownload = async () => {
-    if (downloadStatus !== "downloading") return;
-    try {
-      await ExpoLlmMediapipe.cancelDownload(DOWNLOADABLE_MODEL_NAME);
-      // Listener for "cancelled" status will set isLoadingAction to false.
-    } catch (e: any) {
-      setError(`Cancel download error: ${e.message}`);
-      // If cancel itself fails, isLoadingAction might still be true from the download start.
-      // The download might continue or error out, eventually triggering the listener.
-    }
-  };
 
   const handleLoadModel = async () => {
     if (modelHandle !== undefined) {
       Alert.alert("Model Already Loaded", `Handle: ${modelHandle}`);
       return;
     }
-    if (downloadStatus !== "downloaded") {
-      setError("Model is not downloaded yet.");
-      return;
-    }
     setIsLoadingAction(true);
     setError('');
     try {
-      const handle = await ExpoLlmMediapipe.createModelFromDownloaded(
-        DOWNLOADABLE_MODEL_NAME,
+      if (!modelPath) {
+        console.log("modelPath is null")
+        return;
+      }
+      console.log("trying to createModel from Path")
+      const handle = await ExpoLlmMediapipe.createModel(
+        modelPath,
         1024, // maxTokens
         3,    // topK
         0.7,  // temperature
-        Platform.OS === 'android' ? 123 : undefined, // randomSeed
-        false,
+        123, // random seed
+        true, // multimodal
       );
       setModelHandle(handle);
-      Alert.alert("Model Loaded", `Successfully loaded ${DOWNLOADABLE_MODEL_NAME}. Handle: ${handle}`);
+      console.log("Model Loaded");
     } catch (e: any) {
       setError(`Load Model Error: ${e.message}`);
       setModelHandle(undefined);
@@ -193,6 +103,44 @@ const HooklessDownloadableDemoScreen = () => {
       setIsLoadingAction(false);
     }
   };
+  const pickFile = async (): Promise<string | null> => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: '*/*',
+      copyToCacheDirectory: false,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const fileUri = result.assets[0].uri;
+      const fileName = result.assets[0].name;
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+      if (!fileInfo.exists) {
+        return null;
+      } else {
+        let destPath = FileSystem.documentDirectory + fileName;
+        console.log('Copying file to:', destPath);
+        await FileSystem.copyAsync({ from: fileUri, to: destPath });
+        console.log('File copied to:', destPath);
+
+        // if (destPath.startsWith('file://')) destPath = destPath.slice(7)
+
+        return destPath;
+      }
+    } else {
+      return null;
+    }
+  };
+
+  const handlePickFileModel = async () => {
+    let path = await pickFile();
+    if (path && path.startsWith('file://')) path = path.slice(7)
+    setModelPath(path);
+  };
+  const handlePickFileImage = async () => {
+    const path = await pickFile();
+    setImagePath(path);
+  };
+
+
 
   const handleGenerateResponse = async () => {
     if (modelHandle === undefined) {
@@ -205,7 +153,7 @@ const HooklessDownloadableDemoScreen = () => {
     setError('');
     const requestId = nextRequestIdRef.current++;
     try {
-      const result = await ExpoLlmMediapipe.generateResponse(modelHandle, requestId, prompt, '');
+      const result = await ExpoLlmMediapipe.generateResponse(modelHandle, requestId, prompt, imagePath ?? '');
       setResponse(result);
     } catch (e: any) {
       setError(`Generate Response Error: ${e.message}`);
@@ -247,7 +195,7 @@ const HooklessDownloadableDemoScreen = () => {
     streamingListenersRef.current.push(errorSub);
 
     try {
-      await ExpoLlmMediapipe.generateResponseAsync(modelHandle, currentRequestId, prompt, '');
+      await ExpoLlmMediapipe.generateResponseAsync(modelHandle, currentRequestId, prompt, imagePath ?? '');
       // If successful, promise resolves after all parts.
       // isLoadingAction will be set to false in the finally block.
     } catch (e: any) {
@@ -263,36 +211,20 @@ const HooklessDownloadableDemoScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Hookless: Downloadable Model</Text>
+      <Text style={styles.title}>Yes</Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Model: {DOWNLOADABLE_MODEL_NAME}</Text>
-        <Text>URL: {DOWNLOADABLE_MODEL_URL.substring(0, 50)}...</Text>
-        <Text>Status: {downloadStatus}</Text>
-        {downloadStatus === 'downloading' && (
-          <Text>Progress: {(downloadProgress * 100).toFixed(2)}%</Text>
-        )}
-        {downloadError && <Text style={styles.errorText}>Error: {downloadError}</Text>}
-
         <View style={styles.buttonContainer}>
           <Button
-            title="Download Model (Overwrite)"
-            onPress={handleDownloadModel}
-            disabled={isLoadingAction || downloadStatus === 'downloading' || downloadStatus === 'downloaded'}
+            title="Set Model Path"
+            onPress={handlePickFileModel}
           />
         </View>
         <View style={styles.buttonContainer}>
           <Button
-            title="Cancel Download"
-            onPress={handleCancelDownload}
-            disabled={downloadStatus !== 'downloading' || isLoadingAction} // Also disable if another action is loading
-          />
-        </View>
-        <View style={styles.buttonContainer}>
-          <Button
-            title="Load Downloaded Model"
+            title="Load model from path"
             onPress={handleLoadModel}
-            disabled={isLoadingAction || modelHandle !== undefined || downloadStatus !== 'downloaded'}
+            disabled={modelPath == null}
           />
         </View>
         <View style={styles.buttonContainer}>
@@ -301,13 +233,15 @@ const HooklessDownloadableDemoScreen = () => {
             onPress={handleReleaseModel}
             disabled={isLoadingAction || modelHandle === undefined}
           />
+        </View>
+        <View style={styles.buttonContainer}>
           <Button
-            title="Release Model"
-            onPress={handleReleaseModel}
-            disabled={isLoadingAction || modelHandle === undefined}
+            title="Set image path"
+            onPress={handlePickFileImage}
           />
         </View>
         {modelHandle !== undefined && <Text style={styles.successText}>Model loaded! Handle: {modelHandle}</Text>}
+        {modelPath !== null ? <Text style={styles.successText}>model path: {modelPath}</Text> : <Text style={styles.successText}>model path: empty</Text>}
       </View>
 
       <View style={styles.section}>
@@ -319,6 +253,18 @@ const HooklessDownloadableDemoScreen = () => {
           onChangeText={setPrompt}
           multiline
         />
+        {imagePath ? <View style={styles.container}>
+          <Image
+            source={{ uri: imagePath }} // Adjust path relative to your component file
+            style={styles.image}
+          />
+        </View> :
+
+          <View style={styles.container}>
+            <Text>No Image</Text>
+
+          </View>
+        }
         <View style={styles.buttonContainer}>
           <Button
             title="Generate Response (One-Shot)"
@@ -357,6 +303,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  image: {
+    width: 200, // Important: Always set dimensions for local images
+    height: 200,
+    resizeMode: 'contain', // How the image should fit its container
   },
   contentContainer: {
     padding: 15,
@@ -425,4 +376,4 @@ const styles = StyleSheet.create({
   }
 });
 
-export default HooklessDownloadableDemoScreen;
+export default Yes;

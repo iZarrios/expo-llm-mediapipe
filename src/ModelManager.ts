@@ -178,6 +178,7 @@ export class ModelManager {
    * @param topK - Optional top K value for the model.
    * @param temperature - Optional temperature value for the model.
    * @param randomSeed - Optional random seed for the model.
+   * @param multiModal - Optional multimodal for the model
    * @returns A promise that resolves to the handle of the loaded model.
    */
   public async getDownloadedModels(): Promise<string[]> {
@@ -191,6 +192,7 @@ export class ModelManager {
    * @param topK - Optional top K value for the model.
    * @param temperature - Optional temperature value for the model.
    * @param randomSeed - Optional random seed for the model.
+   * @param multiModal - Optional boolean whether this model has multimodal or not
    * @returns A promise that resolves to the handle of the loaded model.
    */
   public async loadDownloadedModel(
@@ -199,6 +201,7 @@ export class ModelManager {
     topK?: number,
     temperature?: number,
     randomSeed?: number,
+    multiModal?: boolean,
   ): Promise<number> {
     return await ExpoLlmMediapipe.createModelFromDownloaded(
       modelName,
@@ -206,6 +209,7 @@ export class ModelManager {
       topK,
       temperature,
       randomSeed,
+      multiModal,
     );
   }
 

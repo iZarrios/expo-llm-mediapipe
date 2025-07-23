@@ -1,10 +1,18 @@
 package expo.modules.llmmediapipe
 
 import android.content.Context
+import android.net.Uri
+import com.google.mediapipe.tasks.genai.llminference.GraphOptions
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import com.google.mediapipe.tasks.genai.llminference.ProgressListener
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import com.google.mediapipe.framework.image.MPImage;
+import com.google.mediapipe.framework.image.BitmapImageBuilder
 import java.io.File
+import java.io.InputStream
+
 
 class LlmInferenceModel(
     private var context: Context,
@@ -13,6 +21,7 @@ class LlmInferenceModel(
     val topK: Int,
     val temperature: Float,
     val randomSeed: Int,
+    val multiModal: Boolean,
     val inferenceListener: InferenceListener? = null,
 ) {
     private var llmInference: LlmInference
@@ -23,11 +32,13 @@ class LlmInferenceModel(
     private var requestResult: String = ""
     
     init {
+        System.out.println("hello init");
+
         // Create the LLM engine
         val inferenceOptions = LlmInference.LlmInferenceOptions.builder()
             .setModelPath(modelPath)
             .setMaxTokens(maxTokens)
-            .setPreferredBackend(LlmInference.Backend.CPU)
+            .setMaxNumImages(1)
             .build()
 
         try {
@@ -42,6 +53,7 @@ class LlmInferenceModel(
         val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
             .setTemperature(temperature)
             .setTopK(topK)
+            .setGraphOptions(GraphOptions.builder().setEnableVisionModality(multiModal).build())
             .build()
 
         try {
@@ -57,7 +69,8 @@ class LlmInferenceModel(
     /**
      * Generates text asynchronously with streaming results via callback
      */
-    fun generateResponseAsync(requestId: Int, prompt: String, callback: (String) -> Unit) {
+    fun generateResponseAsync(requestId: Int, prompt: String, imagePath:String , callback: (String) -> Unit) {
+        System.out.println("hello async generate response");
         this.requestId = requestId
         this.requestResult = ""
         
@@ -69,12 +82,25 @@ class LlmInferenceModel(
             val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
                 .setTemperature(temperature)
                 .setTopK(topK)
+                .setGraphOptions(GraphOptions.builder().setEnableVisionModality(multiModal).build())
                 .build()
                 
             llmInferenceSession = LlmInferenceSession.createFromOptions(llmInference, sessionOptions)
             
-            // Add the prompt to the session
             llmInferenceSession.addQueryChunk(prompt)
+            // Add the prompt to the session
+            if (multiModal == true && imagePath.length > 0) {
+                val imageUri = Uri.parse(imagePath)
+                val inputStream: InputStream = context.contentResolver.openInputStream(imageUri)!! // !! is used to assert non-null, common when skipping error handling
+                val bitmap: Bitmap = BitmapFactory.decodeStream(inputStream)!! // !! asserts non-null
+                // Close the input stream immediately after decoding the bitmap
+                inputStream.close()
+
+                // Pass the 'bitmap' variable that was just created to BitmapImageBuilder
+                val mpImage: MPImage = BitmapImageBuilder(bitmap).build()
+
+                llmInferenceSession.addImage(mpImage)
+            }
             
             // Define the progress listener for streaming results
             val progressListener = ProgressListener<String> { result, isFinished ->
@@ -100,7 +126,8 @@ class LlmInferenceModel(
     /**
      * Generates text synchronously and returns the complete response
      */
-    fun generateResponse(requestId: Int, prompt: String): String {
+    fun generateResponse(requestId: Int, prompt: String, imagePath: String): String {
+        System.out.println("hello generate response");
         this.requestId = requestId
         this.requestResult = ""
         
@@ -112,12 +139,26 @@ class LlmInferenceModel(
             val sessionOptions = LlmInferenceSession.LlmInferenceSessionOptions.builder()
                 .setTemperature(temperature)
                 .setTopK(topK)
+                .setGraphOptions(GraphOptions.builder().setEnableVisionModality(multiModal).build())
                 .build()
                 
             llmInferenceSession = LlmInferenceSession.createFromOptions(llmInference, sessionOptions)
             
             // Add the prompt to the session
             llmInferenceSession.addQueryChunk(prompt)
+
+            val imageUri = Uri.parse(imagePath)
+            val inputStream: InputStream = context.contentResolver.openInputStream(imageUri)!! // !! is used to assert non-null, common when skipping error handling
+            val bitmap: Bitmap = BitmapFactory.decodeStream(inputStream)!! // !! asserts non-null
+            // Close the input stream immediately after decoding the bitmap
+            inputStream.close()
+
+            // Pass the 'bitmap' variable that was just created to BitmapImageBuilder
+            val mpImage: MPImage = BitmapImageBuilder(bitmap).build()
+
+            if (multiModal) {
+                llmInferenceSession.addImage(mpImage)
+            }
             
             val stringBuilder = StringBuilder()
 
@@ -136,6 +177,7 @@ class LlmInferenceModel(
      * Close resources when no longer needed
      */
     fun close() {
+        System.out.println("hello close");
         try {
             llmInferenceSession.close()
             llmInference.close()
